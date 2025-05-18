@@ -3,6 +3,7 @@ package gee
 import (
 	"log"
 	"net/http"
+	"strings"
 )
 
 type HandlerFunc func(*Context)
@@ -58,13 +59,19 @@ func (group *RouterGroup) POST(pattern string, handler HandlerFunc) {
 func (engine *Engine) Run(addr string) (err error) {
 	return http.ListenAndServe(addr, engine)
 }
+
+func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
+	group.middlewares = append(group.middlewares, middlewares...)
+}
+
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//key := r.Method + "-" + r.URL.Path
-	//if handler, ok := engine.router[key]; ok {
-	//	handler(w, r)
-	//} else {
-	//	fmt.Fprintf(w, "404 NOT FOUND: %s\n", r.URL)
-	//}
+	var middlewares []HandlerFunc
+	for _, group := range engine.groups {
+		if strings.HasPrefix(r.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
 	c := newContext(w, r)
+	c.handlers = middlewares
 	engine.router.handle(c)
 }
